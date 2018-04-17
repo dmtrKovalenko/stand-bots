@@ -6,7 +6,6 @@ export default abstract class BaseAction {
   protected abstract regexp: RegExp | null;
   private _session: ProcessMessageSession | null;
   private _args: string[] | null;
-  private handled = true;
   private used: boolean;
 
   async testAndExecute(session: ProcessMessageSession): Promise<boolean> {
@@ -31,15 +30,15 @@ export default abstract class BaseAction {
     this._session = session;
     this._args = args;
 
-    await this.action();
+    const result = await this.action();
 
     this._session = null;
     this._args = null;
 
-    return this.handled;
+    return result != false;
   }
 
-  protected abstract action(): Promise<void>;
+  protected abstract action(): Promise<void | boolean>;
 
   protected session() {
     if (this._session == null)
@@ -74,10 +73,5 @@ export default abstract class BaseAction {
 
   protected sendTextMessage(text: string) {
     this.session().sendTextMessage(text);
-  }
-
-  // noinspection JSUnusedGlobalSymbols
-  protected markUnhandled() {
-    this.handled = false;
   }
 }
