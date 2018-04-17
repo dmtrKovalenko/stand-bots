@@ -3,17 +3,19 @@ import * as R from "../../constants/messages";
 import delay from 'delay';
 
 export default abstract class BaseAction {
-  private args: string[] | null;
   protected abstract regexp: RegExp | null;
+  private _session: ProcessMessageSession | null;
+  private _args: string[] | null;
+  private handled = true;
+  private used: boolean;
 
-  testAndExecute(session: ProcessMessageSession) {
+  async testAndExecute(session: ProcessMessageSession): Promise<boolean> {
     const message = session.context.message;
 
     if (this.regexp == null)
       throw new Error("Regexp cannot be null");
 
     const regexpResults = this.regexp.exec(message.text);
-
     if (regexpResults == null)
       return false;
 
@@ -21,23 +23,61 @@ export default abstract class BaseAction {
     return this.execute(session, regexpResults);
   }
 
-  execute(session: ProcessMessageSession, args: string[] | null) {
-    this.args = args;
-    return this.action(session);
+  async execute(session: ProcessMessageSession, args: string[] | null): Promise<boolean> {
+    if (this.used)
+      throw new Error("Action cannot be used twice");
+    this.used = true;
+
+    this._session = session;
+    this._args = args;
+
+    await this.action();
+
+    this._session = null;
+    this._args = null;
+
+    return this.handled;
   }
 
-  protected abstract action(session: ProcessMessageSession): Promise<boolean>;
+  protected abstract action(): Promise<void>;
+
+  protected session() {
+    if (this._session == null)
+      throw new Error("Session is not exists");
+
+    return this._session;
+  }
 
   protected arg(index: number) {
-    if (this.args == null)
+    if (this._args == null)
       throw new Error("Args is null");
 
-    return this.args[index];
+    return this._args[index];
   }
 
-  protected processingMessageDelay(session: ProcessMessageSession) {
+  protected context() {
+    return this.session().context;
+  }
+
+  protected userProfile() {
+    return this.context().userProfile;
+  }
+
+  protected async longRunningOperation(action: () => Promise<void>) {
     const _delay = delay(600);
-    _delay.then(() => session.sendTextMessage(R.PROCESSING));
-    return _delay;
+    _delay.then(() => this.session().sendTextMessage(R.PROCESSING));
+
+    await action();
+
+    _delay.cancel();
+  }
+
+  protected sendTextMessage(text: string) {
+    this.session().sendTextMessage(text);
+  }
+
+  // noinspection JSUnusedGlobalSymbols
+  protected markUnhsndled() {
+    this.handled = false;
   }
 }
