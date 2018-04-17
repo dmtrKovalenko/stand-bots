@@ -77,7 +77,7 @@ export default abstract class BaseAction {
   }
 
   // noinspection JSUnusedGlobalSymbols
-  protected markUnhsndled() {
+  protected markUnhandled() {
     this.handled = false;
   }
 }
